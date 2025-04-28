@@ -3,106 +3,190 @@
 
 Follow these steps to set up the Gantry Vision Control Hub on your Raspberry Pi 4.
 
-## 1. Install Required Packages
+## Prerequisites
+- Raspberry Pi 4 with Raspberry Pi OS installed
+- PiCamera module connected and enabled
+- USB-connected gantry controller (GRBL)
+- Network connection to access the Pi
 
+## 1. Initial Setup
+
+Update your system first:
 ```bash
 sudo apt update
-sudo apt install -y python3-pip python3-picamera2 python3-opencv python3-flask git nodejs npm
+sudo apt upgrade -y
+```
 
-# Install Python dependencies
+Install required packages:
+```bash
+# System packages
+sudo apt install -y python3-pip python3-picamera2 python3-opencv git nodejs npm
+
+# Python dependencies
 pip3 install pyserial opencv-python numpy flask
 ```
 
-## 2. Clone or Download the Project
+## 2. Project Installation
 
 ```bash
+# Clone the repository
 cd ~
 git clone <your-repository-url> gantry-vision-control-hub
 cd gantry-vision-control-hub
-```
 
-## 3. Build the React App
-
-```bash
+# Install Node.js dependencies and build
 npm install
 npm run build
 ```
 
-## 4. Set Up the API Server
-
-Make the API server executable:
+## 3. Configure Serial Port Access
 
 ```bash
-chmod +x src/server/api_server.py
+# Add user to dialout group
+sudo usermod -a -G dialout $USER
+
+# Reboot for changes to take effect
+sudo reboot
 ```
 
-## 5. Setup Auto-Start Service
+## 4. Set Up the API Server
 
 ```bash
+# Make server executable
+chmod +x src/server/api_server.py
+
+# Setup service
 sudo cp src/server/gantry-control.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable gantry-control
 sudo systemctl start gantry-control
 ```
 
-To check if the service is running correctly:
+## 5. Verify Installation
 
+Check service status:
 ```bash
 sudo systemctl status gantry-control
 ```
 
-## 6. Access the Control Hub
-
-Open a web browser on any device connected to the same network as your Raspberry Pi and navigate to:
-
-```
-http://[raspberry-pi-ip-address]:5000
-```
-
-Where `[raspberry-pi-ip-address]` is the IP address of your Raspberry Pi.
-
-You can find your Pi's IP address by running:
-
+Find your Pi's IP address:
 ```bash
 hostname -I
+```
+
+Access the web interface at:
+```
+http://<raspberry-pi-ip-address>:5000
 ```
 
 ## Troubleshooting
 
 ### Camera Issues
 
-If the camera feed is not working, check that:
+If the camera feed is not working:
 
-1. The PiCamera is properly connected
-2. The camera is enabled in `raspi-config`:
-
+1. Enable camera in raspi-config:
 ```bash
 sudo raspi-config
 # Navigate to: Interface Options > Camera > Enable
 ```
 
+2. Verify camera detection:
+```bash
+vcgencmd get_camera
+# Should show: supported=1 detected=1
+```
+
 ### Serial Port Issues
 
-If you're having trouble connecting to the serial port:
-
-1. Make sure your user has permission to access serial devices:
-
+1. Add user to dialout group (if not done already):
 ```bash
 sudo usermod -a -G dialout $USER
 # Then log out and log back in
 ```
 
-2. Check that your device is actually at `/dev/ttyUSB0`:
-
+2. Check USB device:
 ```bash
 ls -l /dev/ttyUSB*
 ```
 
-If it's at a different location, update the port in the web interface.
+3. If device is not at `/dev/ttyUSB0`, update the port in the web interface.
 
-### Auto-Alignment Not Working
+### Service Issues
 
-If auto-alignment is not detecting circles:
+1. Check service logs:
+```bash
+sudo journalctl -u gantry-control -f
+```
 
-1. Adjust lighting to improve contrast
-2. You may need to modify the parameters in the `api_server.py` file to adjust the Hough Circles detection parameters for your specific setup.
+2. Verify permissions:
+```bash
+sudo chown -R pi:pi /home/pi/gantry-vision-control-hub
+```
+
+## Usage Guide
+
+1. Connect to web interface using any browser on your network
+2. In the Connection Panel:
+   - Set correct serial port (default: /dev/ttyUSB0)
+   - Set baud rate (default: 115200)
+   - Click Connect
+
+3. Once connected:
+   - Use Gantry Control panel for manual movement
+   - Use Auto-Alignment for circle detection
+   - Monitor status in Status Panel
+   - View live camera feed
+
+4. Maintenance commands:
+```bash
+# Restart service
+sudo systemctl restart gantry-control
+
+# View logs
+sudo journalctl -u gantry-control -f
+
+# Stop service
+sudo systemctl stop gantry-control
+```
+
+## Security Considerations
+
+1. Setup basic firewall:
+```bash
+sudo apt install ufw
+sudo ufw allow 5000
+sudo ufw enable
+```
+
+2. Keep system updated:
+```bash
+sudo apt update
+sudo apt upgrade
+```
+
+For additional security:
+- Consider implementing authentication
+- Restrict access to specific IP addresses
+- Use HTTPS for production environments
+
+## Regular Maintenance
+
+1. Update system packages weekly:
+```bash
+sudo apt update
+sudo apt upgrade
+```
+
+2. Check logs periodically:
+```bash
+sudo journalctl -u gantry-control -n 100
+```
+
+3. Monitor disk space:
+```bash
+df -h
+```
+
+4. Backup your configuration regularly.
+
