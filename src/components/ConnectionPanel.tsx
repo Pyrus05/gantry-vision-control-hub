@@ -18,21 +18,35 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ isConnected, onConnec
 
   const handleConnect = () => {
     if (isConnected) {
-      // Disconnect logic
+      // Disconnect logic - in a real implementation this would call the Python script
       setIsConnecting(true);
-      setTimeout(() => {
-        onConnectionChange(false);
-        setIsConnecting(false);
-        toast.success("Device disconnected");
-      }, 500);
+      
+      // Use fetch to call a script that would stop your Python program
+      fetch('/api/stop_gantry', { method: 'POST' })
+        .catch(err => console.error('Failed to stop the gantry script:', err))
+        .finally(() => {
+          onConnectionChange(false);
+          setIsConnecting(false);
+          toast.success("Device disconnected");
+        });
     } else {
-      // Connect logic
+      // Connect logic - in a real implementation this would call the Python script
       setIsConnecting(true);
-      setTimeout(() => {
-        onConnectionChange(true);
-        setIsConnecting(false);
-        toast.success("Connected to gantry controller");
-      }, 1000);
+      
+      // Use fetch to call a script that would start your Python program with the given parameters
+      fetch('/api/start_gantry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ port, baudRate }),
+      })
+        .catch(err => console.error('Failed to start the gantry script:', err))
+        .finally(() => {
+          onConnectionChange(true);
+          setIsConnecting(false);
+          toast.success("Connected to gantry controller");
+        });
     }
   };
 

@@ -1,0 +1,17 @@
+
+[Unit]
+Description=Gantry Control API Server
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/gantry-vision-control-hub
+ExecStart=/usr/bin/python3 /home/pi/gantry-vision-control-hub/src/server/api_server.py
+Restart=always
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=gantry-control
+
+[Install]
+WantedBy=multi-user.target

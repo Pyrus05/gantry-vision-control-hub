@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CameraFeed from '@/components/CameraFeed';
 import GantryControl from '@/components/GantryControl';
 import ConnectionPanel from '@/components/ConnectionPanel';
@@ -10,6 +10,46 @@ const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [machineState, setMachineState] = useState('Idle');
   const [position, setPosition] = useState({ x: 0, y: 0, z: 0 });
+
+  // Set up event listener for command updates
+  const dispatchCommandEvent = (command: string) => {
+    const event = new CustomEvent('gantry:command-sent', {
+      detail: { command }
+    });
+    window.dispatchEvent(event);
+  };
+
+  // Make GantryControl component aware of this function
+  useEffect(() => {
+    // Expose the dispatchCommandEvent function globally
+    (window as any).dispatchGantryCommand = dispatchCommandEvent;
+  }, []);
+
+  // Update document title
+  useEffect(() => {
+    document.title = "Gantry Vision Control Hub";
+  }, []);
+
+  // Add connection detection for Raspberry Pi
+  useEffect(() => {
+    if (isConnected) {
+      // Poll for status updates
+      const interval = setInterval(() => {
+        // In a real implementation, this would fetch the status from the API
+        fetch('/api/status')
+          .then(response => response.json())
+          .then(data => {
+            setMachineState(data.state || 'Idle');
+            setPosition(data.position || { x: 0, y: 0, z: 0 });
+          })
+          .catch(err => {
+            console.error('Error fetching status:', err);
+          });
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isConnected]);
 
   return (
     <div className="min-h-screen bg-gantry">

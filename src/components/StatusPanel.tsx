@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type StatusPanelProps = {
@@ -13,6 +13,49 @@ type StatusPanelProps = {
 }
 
 const StatusPanel: React.FC<StatusPanelProps> = ({ isConnected, machineState, position }) => {
+  const [lastCommand, setLastCommand] = useState<string>("No commands sent");
+  
+  // In a real implementation, this would fetch status updates from the API
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isConnected) {
+      // Example of how we could poll for status updates
+      interval = setInterval(() => {
+        fetch('/api/status')
+          .then(response => response.json())
+          .then(data => {
+            // This would update with real data in a full implementation
+            console.log('Status update:', data);
+            // setLastCommand(data.lastCommand);
+          })
+          .catch(err => {
+            console.error('Error fetching status:', err);
+          });
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isConnected]);
+  
+  // Listen for commands sent from other components
+  useEffect(() => {
+    const handleCommandSent = (event: CustomEvent) => {
+      if (event.detail && event.detail.command) {
+        setLastCommand(event.detail.command);
+      }
+    };
+    
+    // Using a custom event to communicate between components
+    window.addEventListener('gantry:command-sent' as any, handleCommandSent as any);
+    
+    return () => {
+      window.removeEventListener('gantry:command-sent' as any, handleCommandSent as any);
+    };
+  }, []);
+  
   return (
     <Card className="border border-gantry-accent bg-gantry-highlight">
       <CardHeader className="pb-2">
@@ -52,7 +95,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({ isConnected, machineState, po
           <div className="pt-2 border-t border-gantry-accent/50">
             <div className="text-xs text-gantry-foreground/70">
               {isConnected ? (
-                "Last command: G1 X0.00 Y0.00 F500"
+                `Last command: ${lastCommand}`
               ) : (
                 "No commands sent"
               )}

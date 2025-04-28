@@ -20,6 +20,7 @@ const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
     }
     
     let command = "";
+    let endpoint = "/api/send_gcode";
     
     switch (direction) {
       case "x+":
@@ -44,14 +45,35 @@ const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
         command = "G28";
         break;
       case "align":
-        toast.info("Running auto-alignment sequence");
+        endpoint = "/api/run_alignment";
+        command = "align";
         break;
       default:
         return;
     }
     
-    toast.success(`Command sent: ${command}`);
-    console.log(`Sending command: ${command}`);
+    // Send command to the Python script via API
+    fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ command }),
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        toast.success(`Command sent: ${command}`);
+        console.log('Command response:', data);
+      })
+      .catch(error => {
+        toast.error(`Error sending command: ${error.message}`);
+        console.error('Error sending command:', error);
+      });
   };
 
   return (
