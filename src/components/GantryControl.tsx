@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -12,6 +12,8 @@ type GantryControlProps = {
 const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
   const [stepSize, setStepSize] = useState(1);
   const [feedRate, setFeedRate] = useState(500);
+  const [lastResponse, setLastResponse] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
 
   const handleMove = (direction: string) => {
     if (!isConnected) {
@@ -48,9 +50,17 @@ const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
         endpoint = "/api/run_alignment";
         command = "align";
         break;
+      case "test":
+        // Test command to verify serial connection
+        command = "M115"; // Get firmware info
+        break;
       default:
         return;
     }
+    
+    // Show sending notification
+    toast.info(`Sending: ${command}`);
+    console.log(`Sending command: ${command} to endpoint: ${endpoint}`);
     
     // Send command to the Python script via API
     fetch(endpoint, {
@@ -61,16 +71,23 @@ const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
       body: JSON.stringify({ command }),
     })
       .then(response => {
+        console.log('Response status:', response.status);
         if (!response.ok) {
-          throw new Error('Network response was not ok');
+          return response.text().then(text => {
+            throw new Error(`Network response was not ok: ${text}`);
+          });
         }
         return response.json();
       })
       .then(data => {
+        const responseText = data.response || 'No response from controller';
+        setLastResponse(responseText);
+        setDebugInfo(JSON.stringify(data));
         toast.success(`Command sent: ${command}`);
         console.log('Command response:', data);
       })
       .catch(error => {
+        setDebugInfo(`Error: ${error.message}`);
         toast.error(`Error sending command: ${error.message}`);
         console.error('Error sending command:', error);
       });
@@ -159,6 +176,13 @@ const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
 
             <div className="col-span-3">
               <Button 
+                onClick={() => handleMove("test")} 
+                disabled={!isConnected}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 mb-2"
+              >
+                Test Connection
+              </Button>
+              <Button 
                 onClick={() => handleMove("align")} 
                 disabled={!isConnected}
                 className="w-full bg-blue-600 hover:bg-blue-700"
@@ -167,6 +191,16 @@ const GantryControl: React.FC<GantryControlProps> = ({ isConnected }) => {
               </Button>
             </div>
           </div>
+
+          {/* Debug section */}
+          {lastResponse && (
+            <div className="pt-2 border-t border-gantry-accent/50 text-xs">
+              <div className="font-medium mb-1">Last Response:</div>
+              <div className="bg-black/20 p-2 rounded overflow-x-auto">
+                <pre>{lastResponse}</pre>
+              </div>
+            </div>
+          )}
 
           {/* Settings section */}
           <div className="space-y-4 pt-2 border-t border-gantry-accent/50">

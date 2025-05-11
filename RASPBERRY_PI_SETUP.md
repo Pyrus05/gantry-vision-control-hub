@@ -149,6 +149,57 @@ http://<raspberry-pi-ip-address>:5000
 
 ## Troubleshooting
 
+### Motion Control Issues
+
+If the camera works but gantry motion does not:
+
+1. Check serial port permissions:
+```bash
+ls -l /dev/ttyUSB*
+# Should show something like: crw-rw---- 1 root dialout 188, 0 May 11 10:15 /dev/ttyUSB0
+# The important part is that your user or the dialout group has rw (read-write) access
+```
+
+2. Verify your user is in the dialout group:
+```bash
+groups
+# Should include 'dialout' in the list
+```
+
+3. If your user is not in the dialout group, add it:
+```bash
+sudo usermod -a -G dialout $USER
+# Then log out and log back in, or reboot
+```
+
+4. Test serial communication manually:
+```bash
+# Install screen if not already installed
+sudo apt install screen
+
+# Try to communicate directly with the controller
+screen /dev/ttyUSB0 115200
+```
+Then type: `M115` followed by Enter to get firmware info.
+To exit screen, press Ctrl+A followed by backslash (\), then Y to confirm.
+
+5. Check if the correct firmware is loaded on your controller:
+```bash
+# While connected with screen, send:
+M115
+# The response should identify the GRBL version or other controller info
+```
+
+6. Check for port conflicts:
+```bash
+sudo lsof | grep ttyUSB
+# This shows if any other process is using the serial port
+```
+
+7. Try a different USB port on your Raspberry Pi.
+
+8. Try a different USB cable.
+
 ### Camera Issues
 
 If the camera feed is not working:

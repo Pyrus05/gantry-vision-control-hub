@@ -8,6 +8,7 @@ import threading
 import io
 import signal
 import logging
+import traceback
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +61,7 @@ def capture_camera():
             
     except Exception as e:
         logger.error(f"Camera thread error: {str(e)}")
+        logger.error(traceback.format_exc())
 
 @app.route('/')
 def index():
@@ -89,6 +91,8 @@ def start_gantry():
         port = data.get('port', '/dev/ttyUSB0')
         baud_rate = data.get('baudRate', '115200')
         
+        logger.info(f"Starting gantry with port: {port}, baud rate: {baud_rate}")
+        
         if gantry_process:
             return jsonify({"message": "Gantry process already running"}), 200
         
@@ -97,11 +101,79 @@ def start_gantry():
         camera_thread.daemon = True
         camera_thread.start()
         
+        # Test serial port
+        try:
+            import serial
+            ser = serial.Serial(port, int(baud_rate), timeout=1)
+            ser.write(b"\r\n")  # Send a newline to clear any pending commands
+            time.sleep(0.1)
+            ser.close()
+            logger.info("Serial port test successful")
+        except Exception as e:
+            error_msg = f"Serial port test failed: {str(e)}"
+            logger.error(error_msg)
+            return jsonify({"error": error_msg}), 500
+        
         return jsonify({"message": "Gantry connected successfully"})
     
     except Exception as e:
-        logger.error(f"Error starting gantry: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        error_msg = f"Error starting gantry: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return jsonify({"error": error_msg}), 500
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    """Get the current status of the gantry"""
+    try:
+        # Import serial here to avoid issues if not available
+        import serial
+        
+        try:
+            # Try to open the serial port
+            ser = serial.Serial(port, int(baud_rate), timeout=1)
+            time.sleep(0.1)
+            
+            # Ask for position
+            ser.write(b"M114\n")
+            
+            # Read response
+            response = ""
+            start_time = time.time()
+            while time.time() - start_time < 2:  # 2 second timeout
+                if ser.in_waiting:
+                    response += ser.readline().decode().strip() + "\n"
+                    if "ok" in response:
+                        break
+                time.sleep(0.1)
+            
+            ser.close()
+            
+            # Parse position from response
+            position = {"x": 0, "y": 0, "z": 0}
+            state = "Unknown"
+            
+            if "X:" in response:
+                parts = response.split()
+                for part in parts:
+                    if part.startswith("X:"):
+                        position["x"] = float(part[2:])
+                    elif part.startswith("Y:"):
+                        position["y"] = float(part[2:])
+                    elif part.startswith("Z:"):
+                        position["z"] = float(part[2:])
+            
+            return jsonify({
+                "state": "Connected", 
+                "position": position,
+                "raw_response": response
+            })
+        except Exception as e:
+            logger.error(f"Error getting status: {str(e)}")
+            return jsonify({"state": "Error", "error": str(e)})
+    
+    except ImportError:
+        return jsonify({"state": "Error", "error": "Serial module not found"})
 
 @app.route('/api/stop_gantry', methods=['POST'])
 def stop_gantry():
@@ -117,6 +189,7 @@ def stop_gantry():
     
     except Exception as e:
         logger.error(f"Error stopping gantry: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/send_gcode', methods=['POST'])
@@ -129,25 +202,50 @@ def send_gcode():
         if not command:
             return jsonify({"error": "No command provided"}), 400
         
+        logger.info(f"Sending G-code: {command}")
+        
         # Import serial here to avoid issues if not available
         import serial
         
-        # Open serial connection
-        ser = serial.Serial(port, int(baud_rate), timeout=1)
-        time.sleep(0.1)
-        
-        # Send command
-        ser.write((command.strip() + '\n').encode())
-        
-        # Read response
-        response = ser.readline().decode().strip()
-        ser.close()
-        
-        return jsonify({"message": "Command sent", "response": response})
+        try:
+            # Open serial connection
+            ser = serial.Serial(port, int(baud_rate), timeout=1)
+            time.sleep(0.1)
+            
+            # Send command
+            ser.write((command.strip() + '\n').encode())
+            
+            # Read response with timeout to avoid hanging
+            response = ""
+            start_time = time.time()
+            while time.time() - start_time < 5:  # 5 second timeout
+                if ser.in_waiting:
+                    line = ser.readline().decode().strip()
+                    response += line + "\n"
+                    if "ok" in line:
+                        break
+                time.sleep(0.1)
+            
+            ser.close()
+            
+            if not response:
+                response = "No response from controller (timeout)"
+                
+            logger.info(f"Command response: {response}")
+            
+            return jsonify({"message": "Command sent", "response": response, "command": command})
+            
+        except Exception as e:
+            error_msg = f"Serial communication error: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            return jsonify({"error": error_msg, "command": command}), 500
     
     except Exception as e:
-        logger.error(f"Error sending G-code: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        error_msg = f"Error processing request: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return jsonify({"error": error_msg}), 500
 
 @app.route('/api/run_alignment', methods=['POST'])
 def run_alignment():
@@ -214,6 +312,7 @@ def run_alignment():
     
     except Exception as e:
         logger.error(f"Error running alignment: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(404)
