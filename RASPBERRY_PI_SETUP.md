@@ -51,6 +51,10 @@ sudo reboot
 
 ## 4. Set Up the API Server
 
+There are two ways to set up the service file. Try Method 1 first, and if you encounter permission issues, use Method 2.
+
+### Method 1: Direct Copy
+
 ```bash
 # Make server executable
 chmod +x src/server/api_server.py
@@ -61,6 +65,64 @@ sudo systemctl daemon-reload
 sudo systemctl enable gantry-control
 sudo systemctl start gantry-control
 ```
+
+### Method 2: Create Service File Manually
+
+If you encounter permission issues with the copy command, create the service file manually:
+
+```bash
+# Make server executable
+chmod +x src/server/api_server.py
+
+# Create service file with nano
+sudo nano /etc/systemd/system/gantry-control.service
+```
+
+Then paste the following content (press Ctrl+Shift+V to paste in the terminal):
+
+```
+[Unit]
+Description=Gantry Control API Server
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/gantry-vision-control-hub
+ExecStart=/usr/bin/python3 /home/pi/gantry-vision-control-hub/src/server/api_server.py
+Restart=always
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=gantry-control
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Save and exit by pressing Ctrl+X, then Y, then Enter. Then continue with:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable gantry-control
+sudo systemctl start gantry-control
+```
+
+### Method 3: Run Without Systemd
+
+If you're still having issues with systemd, you can run the server directly:
+
+```bash
+# Make server executable
+chmod +x src/server/api_server.py
+
+# Run the server (in a screen session to keep it running)
+sudo apt install screen
+screen -S gantry
+python3 src/server/api_server.py
+```
+
+To detach from the screen session, press Ctrl+A followed by D. 
+To reattach later: `screen -r gantry`
 
 ## 5. Verify Installation
 
@@ -189,4 +251,3 @@ df -h
 ```
 
 4. Backup your configuration regularly.
-
