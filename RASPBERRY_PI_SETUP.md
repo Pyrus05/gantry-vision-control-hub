@@ -51,16 +51,22 @@ sudo reboot
 
 ## 4. Set Up the API Server
 
-There are two ways to set up the service file. Try Method 1 first, and if you encounter permission issues, use Method 2.
+There are three ways to set up the service file. Try Method 1 first, and if you encounter permission issues, use Method 2 or 3.
 
 ### Method 1: Direct Copy
+
+Important: Make sure to use a space between the source and destination paths in the cp command!
 
 ```bash
 # Make server executable
 chmod +x src/server/api_server.py
 
 # Setup service
+# NOTE: Check the correct filename - it should be gantry-control.service (with a hyphen)
 sudo cp src/server/gantry-control.service /etc/systemd/system/
+# OR if your file is named gantry_control.service (with an underscore)
+# sudo cp src/server/gantry_control.service /etc/systemd/system/gantry-control.service
+
 sudo systemctl daemon-reload
 sudo systemctl enable gantry-control
 sudo systemctl start gantry-control
